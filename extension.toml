@@ -1,0 +1,16 @@
+id = "gh"
+name = "Github context"
+description = "Adds context from github"
+version = "0.1.0"
+schema_version = 1
+authors = ["Bjørn Gilstad <github_context_zed@gilstad.io>"]
+repository = ""
+
+[[capabilities]]
+kind = "process:exec"
+command = "git"
+args = ["**"]
+
+[slash_commands.gh-pr]
+description = "Takes a PR link and returns a summary"
+requires_argument = true
