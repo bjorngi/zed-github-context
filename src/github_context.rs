@@ -21,8 +21,9 @@ impl zed::Extension for SlashCommandsExampleExtension {
         match command.name.as_str() {
             "pr-link" => Ok(vec![]),
             "pr-open" => {
-                let owner = "navikt";
-                let repo = "pensjonskalkulator-frontend";
+                // TODO: Figure how to get this dynamically, missing workspace
+                let owner = "zed-industries";
+                let repo = "zed";
 
                 // Fetch open pull requests
                 match github_api::get_github_open_pull_requests(owner, repo, &Config::default()) {
