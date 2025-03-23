@@ -13,7 +13,7 @@ pub fn pr_data(
 
     // Convert the pull request to a PromptPart
     let content = format!(
-        "PR #{}: {}\n\n{}",
+        "\nPR #{}: {}\n\n{}\n",
         pull_request.number,
         pull_request.title,
         pull_request
@@ -23,7 +23,7 @@ pub fn pr_data(
 
     let pr_prompt_part = PromptPart {
         length: content.len(),
-        label: format!("PR #{}: {}", pull_request.number, pull_request.title),
+        label: format!("PR #{}: {}\n", pull_request.number, pull_request.title),
         content,
     };
 
@@ -39,10 +39,19 @@ pub fn pr_data(
     let comment_parts: Vec<PromptPart> = comments
         .into_iter()
         .map(|comment| {
-            let content = format!("```diff\n{}\n```\n\n{}", comment.diff_hunk, comment.body);
+            let content = format!(
+                "\nComment from user: {}\n```diff\n{}\n```\n\n{}\n",
+                comment.user.login, comment.diff_hunk, comment.body
+            );
+            let label = if comment.in_reply_to_id != 0 {
+                format!("↪ Reply to comment by @{}", comment.user.login)
+            } else {
+                format!("Comment by @{}", comment.user.login)
+            };
+
             PromptPart {
                 length: content.len(),
-                label: format!("Comment by @{}", comment.user.login),
+                label,
                 content,
             }
         })
