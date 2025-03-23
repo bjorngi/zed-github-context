@@ -5,7 +5,7 @@ use crate::Config;
 
 #[derive(Debug, Serialize)]
 pub struct PullRequest {
-    pub number: u32,
+    pub number: u64,
     pub title: String,
     pub state: String,
     pub html_url: String,
@@ -111,7 +111,7 @@ fn parse_github_pr_comments(
 pub fn get_github_pr_comments(
     repo_owner: &str,
     repo_name: &str,
-    pr_number: u32,
+    pr_number: u64,
     config: &Config,
 ) -> Result<Vec<PullRequestComment>, Box<dyn std::error::Error>> {
     // We need to get both issues comments and PR review comments to include outdated ones
@@ -199,7 +199,7 @@ fn parse_github_pull_request(
         number: data
             .get("number")
             .and_then(|v| v.as_u64())
-            .ok_or("Missing PR number")? as u32,
+            .ok_or("Missing PR number")?,
         title: data
             .get("title")
             .and_then(|v| v.as_str())
@@ -284,4 +284,69 @@ pub fn get_github_pull_request(
     }
 
     parse_github_pull_request(&data)
+}
+
+pub fn get_github_open_pull_requests(
+    repo_owner: &str,
+    repo_name: &str,
+    config: &Config,
+) -> Result<Vec<PullRequest>, Box<dyn std::error::Error>> {
+    let url = format!(
+        "https://api.github.com/repos/{}/{}/pulls?state=open",
+        repo_owner, repo_name
+    );
+
+    let mut request_builder = zed::http_client::HttpRequest::builder()
+        .method(zed::http_client::HttpMethod::Get)
+        .url(&url)
+        .header("Accept", "application/vnd.github.v3+json")
+        .header("User-Agent", "zed-app");
+
+    // Only add Authorization header if token exists
+    if let Some(token) = &config.github_token {
+        request_builder = request_builder.header("Authorization", format!("Bearer {}", token));
+    }
+
+    let request = request_builder
+        .build()
+        .map_err(|e| Box::<dyn std::error::Error>::from(e.to_string()))?;
+
+    let response = zed::http_client::fetch(&request)
+        .map_err(|e| Box::<dyn std::error::Error>::from(e.to_string()))?;
+
+    // Check status code from headers
+    let status_code = response
+        .headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("status"))
+        .and_then(|(_, v)| v.split_whitespace().next())
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(0);
+
+    let data: Vec<serde_json::Value> = serde_json::from_slice(&response.body)?;
+
+    // Check for error responses
+    if status_code >= 400 {
+        let error_message = if !data.is_empty() && data[0].get("message").is_some() {
+            data[0]["message"]
+                .as_str()
+                .unwrap_or("Unknown GitHub API error")
+        } else {
+            "Unknown GitHub API error"
+        };
+        return Err(format!("GitHub API error: {} ({})", error_message, status_code).into());
+    }
+
+    let mut pull_requests = Vec::new();
+    for pr_data in data {
+        match parse_github_pull_request(&pr_data) {
+            Ok(pr) => pull_requests.push(pr),
+            Err(e) => {
+                // Log error but continue processing other PRs
+                eprintln!("Failed to parse pull request: {}", e);
+            }
+        }
+    }
+
+    Ok(pull_requests)
 }
