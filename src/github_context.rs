@@ -1,16 +1,12 @@
+mod commands;
 mod config;
 mod github_api;
+mod prompt_utils;
 
 use config::Config;
 use zed_extension_api as zed;
 
 struct SlashCommandsExampleExtension;
-
-struct PromptPart {
-    length: usize,
-    label: String,
-    content: String,
-}
 
 impl zed::Extension for SlashCommandsExampleExtension {
     fn new() -> Self {
@@ -23,7 +19,28 @@ impl zed::Extension for SlashCommandsExampleExtension {
         _args: Vec<String>,
     ) -> Result<Vec<zed_extension_api::SlashCommandArgumentCompletion>, String> {
         match command.name.as_str() {
-            "gh-pr" => Ok(vec![]),
+            "pr-link" => Ok(vec![]),
+            "pr-open" => {
+                // TODO: Figure how to get this dynamically, missing workspace
+                let owner = "zed-industries";
+                let repo = "zed";
+
+                // Fetch open pull requests
+                match github_api::get_github_open_pull_requests(owner, repo, &Config::default()) {
+                    Ok(prs) => {
+                        let completions = prs
+                            .iter()
+                            .map(|pr| zed_extension_api::SlashCommandArgumentCompletion {
+                                label: format!("#{}: {}", pr.number, pr.title),
+                                new_text: format!("{},{},{}", owner, repo, pr.number),
+                                run_command: true,
+                            })
+                            .collect();
+                        Ok(completions)
+                    }
+                    Err(e) => Err(format!("Failed to fetch pull requests: {}", e)),
+                }
+            }
             command => Err(format!("unknown slash command: \"{command}\"")),
         }
     }
@@ -34,10 +51,49 @@ impl zed::Extension for SlashCommandsExampleExtension {
         args: Vec<String>,
         worktree: Option<&zed::Worktree>,
     ) -> Result<zed::SlashCommandOutput, String> {
+        let config = Config::from_worktree(worktree);
         match command.name.as_str() {
-            "gh-pr" => {
-                let config = Config::from_worktree(worktree);
+            "pr-open" => {
+                // Get owner and repo from args if provided
+                let parts: Vec<&str> = if !args.is_empty() && args[0].contains(',') {
+                    args[0].split(',').collect()
+                } else {
+                    vec![]
+                };
 
+                let owner = parts
+                    .get(0)
+                    .map(|s| *s)
+                    .ok_or("Owner not provided in args")?;
+                let repo = parts
+                    .get(1)
+                    .map(|s| *s)
+                    .ok_or("Repository not provided in args")?;
+
+                let pr_number = parts
+                    .get(2)
+                    .ok_or("No PR number provided. Please provide a PR number.")?
+                    .parse::<u32>()
+                    .map_err(|_| "Invalid PR number")?;
+
+                // Use the pr_data function from the commands module to get PR details and comments
+                let pr_prompt_parts = commands::pr_data(owner, repo, pr_number, &config)?;
+
+                // Create a combined string of all parts
+                let mut text = String::new();
+                for (i, part) in pr_prompt_parts.iter().enumerate() {
+                    if i > 0 {
+                        text.push_str("\n\n");
+                    }
+                    text.push_str(&part.content);
+                }
+
+                // Create sections from parts
+                let sections = prompt_utils::build_output_sections(pr_prompt_parts);
+
+                Ok(zed::SlashCommandOutput { sections, text })
+            }
+            "pr-link" => {
                 let pr_url = args
                     .first()
                     .ok_or("No URL provided. Please provide a GitHub pull request URL.")?;
@@ -65,45 +121,11 @@ impl zed::Extension for SlashCommandsExampleExtension {
                 let owner = repo_parts[0];
                 let repo = repo_parts[1];
 
-                // Use the github_api::get_github_pull_request function
-                let pull_request =
-                    github_api::get_github_pull_request(owner, repo, pr_number, &config)
-                        .map_err(|e| format!("Error fetching PR: {}", e))?;
-
-                // Convert the pull request to a PromptPart
-                let pr_prompt_part = PromptPart {
-                    length: pull_request.body.as_ref().map_or(0, |body| body.len()),
-                    label: format!("PR #{}: {}", pull_request.number, pull_request.title),
-                    content: pull_request
-                        .body
-                        .unwrap_or_else(|| "No description provided.".to_string()),
-                };
-
-                // Fetch comments
-                let comments = github_api::get_github_pr_comments(owner, repo, pr_number, &config)
-                    .map_err(|e| format!("Error fetching PR comments: {}", e))?;
-
-                // Convert comments to a vector of PromptPart
-                let comment_prompt_parts: Vec<PromptPart> = comments
-                    .into_iter()
-                    .map(|comment| {
-                        let content =
-                            format!("```diff\n{}\n```\n\n{}", comment.diff_hunk, comment.body);
-                        PromptPart {
-                            length: content.len(),
-                            label: format!("Comment by @{}", comment.user.login),
-                            content,
-                        }
-                    })
-                    .collect();
-
-                // Combine PR description and comments into a single vector
-                let mut all_prompt_parts = vec![pr_prompt_part];
-                all_prompt_parts.extend(comment_prompt_parts);
+                let pr_prompt_parts = commands::pr_data(owner, repo, pr_number, &config)?;
 
                 // Create a combined string of all parts
                 let mut text = String::new();
-                for (i, part) in all_prompt_parts.iter().enumerate() {
+                for (i, part) in pr_prompt_parts.iter().enumerate() {
                     if i > 0 {
                         text.push_str("\n\n");
                     }
@@ -111,20 +133,7 @@ impl zed::Extension for SlashCommandsExampleExtension {
                 }
 
                 // Create sections from parts
-                let mut sections = Vec::new();
-                let mut current_position = 0;
-
-                for (i, part) in all_prompt_parts.iter().enumerate() {
-                    sections.push(zed::SlashCommandOutputSection {
-                        range: (current_position..(current_position + part.length as u32)).into(),
-                        label: part.label.clone(),
-                    });
-
-                    current_position += part.length as u32;
-                    if i < all_prompt_parts.len() - 1 {
-                        current_position += 2; // +2 for the "\n\n" separator
-                    }
-                }
+                let sections = prompt_utils::build_output_sections(pr_prompt_parts);
 
                 Ok(zed::SlashCommandOutput { sections, text })
             }

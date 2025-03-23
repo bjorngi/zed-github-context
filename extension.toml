@@ -11,6 +11,10 @@ kind = "process:exec"
 command = "git"
 args = ["**"]
 
-[slash_commands.gh-pr]
-description = "Takes a PR link and returns a summary"
+[slash_commands.pr-link]
+description = "Takes a pull request link (github) and adds to context"
+requires_argument = true
+
+[slash_commands.pr-open]
+description = "List open pull requests in current repository and adds to context"
 requires_argument = true

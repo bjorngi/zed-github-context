@@ -17,4 +17,8 @@ impl Config {
 
         Config { github_token }
     }
+
+    pub fn default() -> Self {
+        Config { github_token: None }
+    }
 }
