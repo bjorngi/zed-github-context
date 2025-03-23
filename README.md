@@ -3,7 +3,13 @@
 Extention to Zed Editor to provide Github context for AI
 
 
+## Configuration
 
+This extension requires three environment variables to be set:
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_TOKEN` | A personal access token for Github that can access issues and pull requests (read only) |
 
 # Acknowledgments
 - [jira-slash-command extension](https://github.com/trbroyles1/jira-slash-command/tree/ab76298a0007b7395a739aa91ad0ffc3ff35f7e6) for inspiration (and some code)
