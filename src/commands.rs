@@ -12,17 +12,19 @@ pub fn pr_data(
         .map_err(|e| format!("Error fetching PR: {}", e))?;
 
     // Convert the pull request to a PromptPart
+    let content = format!(
+        "PR #{}: {}\n\n{}",
+        pull_request.number,
+        pull_request.title,
+        pull_request
+            .body
+            .unwrap_or_else(|| "No description provided.".to_string())
+    );
+
     let pr_prompt_part = PromptPart {
-        length: pull_request.body.as_ref().map_or(0, |body| body.len()),
+        length: content.len(),
         label: format!("PR #{}: {}", pull_request.number, pull_request.title),
-        content: format!(
-            "PR #{}: {}\n\n{}",
-            pull_request.number,
-            pull_request.title,
-            pull_request
-                .body
-                .unwrap_or_else(|| "No description provided.".to_string())
-        ),
+        content,
     };
 
     // Fetch comments

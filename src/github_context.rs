@@ -89,7 +89,7 @@ impl zed::Extension for SlashCommandsExampleExtension {
                 }
 
                 // Create sections from parts
-                let sections = prompt_utils::build_output_sections(pr_prompt_parts);
+                let sections = prompt_utils::build_output_sections(&pr_prompt_parts);
 
                 Ok(zed::SlashCommandOutput { sections, text })
             }
@@ -123,17 +123,9 @@ impl zed::Extension for SlashCommandsExampleExtension {
 
                 let pr_prompt_parts = commands::pr_data(owner, repo, pr_number, &config)?;
 
-                // Create a combined string of all parts
-                let mut text = String::new();
-                for (i, part) in pr_prompt_parts.iter().enumerate() {
-                    if i > 0 {
-                        text.push_str("\n\n");
-                    }
-                    text.push_str(&part.content);
-                }
-
                 // Create sections from parts
-                let sections = prompt_utils::build_output_sections(pr_prompt_parts);
+                let sections = prompt_utils::build_output_sections(&pr_prompt_parts);
+                let text = prompt_utils::build_output_text(&pr_prompt_parts);
 
                 Ok(zed::SlashCommandOutput { sections, text })
             }

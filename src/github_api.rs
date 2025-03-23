@@ -5,7 +5,7 @@ use crate::Config;
 
 #[derive(Debug, Serialize)]
 pub struct PullRequest {
-    pub number: u64,
+    pub number: u32,
     pub title: String,
     pub state: String,
     pub html_url: String,
@@ -18,13 +18,13 @@ pub struct PullRequest {
 #[derive(Debug, Serialize)]
 pub struct User {
     pub login: String,
-    pub id: u64,
+    pub id: u32,
     pub avatar_url: String,
 }
 
 #[derive(Debug, Serialize)]
 pub struct PullRequestComment {
-    pub id: u64,
+    pub id: u32,
     pub body: String,
     pub user: User,
     pub created_at: String,
@@ -32,7 +32,7 @@ pub struct PullRequestComment {
     pub html_url: String,
     pub path: String,
     pub diff_hunk: String,
-    pub in_reply_to_id: u64,
+    pub in_reply_to_id: u32,
 }
 
 fn parse_github_pr_comments(
@@ -52,7 +52,7 @@ fn parse_github_pr_comments(
             id: user_data
                 .get("id")
                 .and_then(|v| v.as_u64())
-                .ok_or("Missing user id")?,
+                .ok_or("Missing user id")? as u32,
             avatar_url: user_data
                 .get("avatar_url")
                 .and_then(|v| v.as_str())
@@ -64,7 +64,7 @@ fn parse_github_pr_comments(
             id: comment_data
                 .get("id")
                 .and_then(|v| v.as_u64())
-                .ok_or("Missing comment id")?,
+                .ok_or("Missing comment id")? as u32,
             body: comment_data
                 .get("body")
                 .and_then(|v| v.as_str())
@@ -99,7 +99,7 @@ fn parse_github_pr_comments(
             in_reply_to_id: comment_data
                 .get("in_reply_to_id")
                 .and_then(|v| v.as_u64())
-                .unwrap_or(0),
+                .unwrap_or(0) as u32,
         };
 
         comments.push(comment);
@@ -111,7 +111,7 @@ fn parse_github_pr_comments(
 pub fn get_github_pr_comments(
     repo_owner: &str,
     repo_name: &str,
-    pr_number: u64,
+    pr_number: u32,
     config: &Config,
 ) -> Result<Vec<PullRequestComment>, Box<dyn std::error::Error>> {
     // We need to get both issues comments and PR review comments to include outdated ones
@@ -187,7 +187,7 @@ fn parse_github_pull_request(
         id: user_data
             .get("id")
             .and_then(|v| v.as_u64())
-            .ok_or("Missing user id")?,
+            .ok_or("Missing user id")? as u32,
         avatar_url: user_data
             .get("avatar_url")
             .and_then(|v| v.as_str())
@@ -199,7 +199,7 @@ fn parse_github_pull_request(
         number: data
             .get("number")
             .and_then(|v| v.as_u64())
-            .ok_or("Missing PR number")?,
+            .ok_or("Missing PR number")? as u32,
         title: data
             .get("title")
             .and_then(|v| v.as_str())

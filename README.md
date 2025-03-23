@@ -1,6 +1,18 @@
 # Github Context
 
-Extention to Zed Editor to provide Github context for AI
+Extention to Zed Editor to provide Github context for AI. This is usefull for improving code after a pull request has gotten feedback.
+
+## Commands
+
+### /pr-link <link to github PR>
+
+
+### /pr-open
+
+List Pull Request from current repository
+![PR Open](img/pr-open.png)
+
+**Note:** This command does not work, as the workspace cannot be accessed in `run_slash_command`.
 
 
 ## Configuration

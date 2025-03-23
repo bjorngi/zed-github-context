@@ -6,21 +6,26 @@ pub struct PromptPart {
     pub content: String,
 }
 
-pub fn build_output_sections(parts: Vec<PromptPart>) -> Vec<zed::SlashCommandOutputSection> {
+pub fn build_output_sections(parts: &Vec<PromptPart>) -> Vec<zed::SlashCommandOutputSection> {
     let mut sections = Vec::new();
     let mut current_position = 0;
 
-    for (i, part) in parts.iter().enumerate() {
+    for (_i, part) in parts.iter().enumerate() {
         sections.push(zed::SlashCommandOutputSection {
             range: (current_position..(current_position + part.length)).into(),
             label: part.label.clone(),
         });
 
         current_position += part.length;
-        if i < parts.len() - 1 {
-            current_position += 2; // +2 for the "\n\n" separator
-        }
     }
 
     sections
+}
+
+pub fn build_output_text(parts: &Vec<PromptPart>) -> String {
+    let mut text = String::new();
+    for part in parts.iter() {
+        text.push_str(&part.content);
+    }
+    text
 }
