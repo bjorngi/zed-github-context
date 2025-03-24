@@ -9,7 +9,13 @@ repository = ""
 [[capabilities]]
 kind = "process:exec"
 command = "git"
-args = ["**"]
+args = ["-C", "*", "rev-parse", "--abbrev-ref", "HEAD"]
+
+[[capabilities]]
+kind = "process:exec"
+command = "git"
+args = ["-C", "*", "config", "--get", "remote.origin.url"]
+
 
 [slash_commands.pr-link]
 description = "Takes a pull request link (github) and adds to context"
@@ -18,3 +24,7 @@ requires_argument = true
 [slash_commands.pr-open]
 description = "List open pull requests in current repository and adds to context"
 requires_argument = true
+
+[slash_commands.pr-current]
+description = "Find pull request of current branch"
+requires_argument = false
