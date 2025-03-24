@@ -290,6 +290,7 @@ pub fn get_github_open_pull_requests(
     repo_owner: &str,
     repo_name: &str,
     config: &Config,
+    branch: Option<&str>,
 ) -> Result<Vec<PullRequest>, Box<dyn std::error::Error>> {
     let url = format!(
         "https://api.github.com/repos/{}/{}/pulls?state=open",
@@ -305,6 +306,11 @@ pub fn get_github_open_pull_requests(
     // Only add Authorization header if token exists
     if let Some(token) = &config.github_token {
         request_builder = request_builder.header("Authorization", format!("Bearer {}", token));
+    }
+
+    // Add base branch filter if provided
+    if let Some(base_branch) = branch {
+        request_builder = request_builder.header("base", base_branch);
     }
 
     let request = request_builder
@@ -339,6 +345,17 @@ pub fn get_github_open_pull_requests(
 
     let mut pull_requests = Vec::new();
     for pr_data in data {
+        // Filter by branch if specified
+        if let Some(branch_name) = branch {
+            if let Some(head) = pr_data.get("head") {
+                if let Some(ref_name) = head.get("ref").and_then(|v| v.as_str()) {
+                    if ref_name != branch_name {
+                        continue; // Skip if branch doesn't match
+                    }
+                }
+            }
+        }
+
         match parse_github_pull_request(&pr_data) {
             Ok(pr) => pull_requests.push(pr),
             Err(e) => {

@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod git;
 mod github_api;
 mod prompt_utils;
 
@@ -26,7 +27,12 @@ impl zed::Extension for SlashCommandsExampleExtension {
                 let repo = "zed";
 
                 // Fetch open pull requests
-                match github_api::get_github_open_pull_requests(owner, repo, &Config::default()) {
+                match github_api::get_github_open_pull_requests(
+                    owner,
+                    repo,
+                    &Config::default(),
+                    None,
+                ) {
                     Ok(prs) => {
                         let completions = prs
                             .iter()
@@ -41,6 +47,7 @@ impl zed::Extension for SlashCommandsExampleExtension {
                     Err(e) => Err(format!("Failed to fetch pull requests: {}", e)),
                 }
             }
+            "pr-current" => Ok(vec![]),
             command => Err(format!("unknown slash command: \"{command}\"")),
         }
     }
@@ -111,6 +118,54 @@ impl zed::Extension for SlashCommandsExampleExtension {
                 let repo = repo_parts[1];
 
                 let pr_prompt_parts = commands::pr_data(owner, repo, pr_number, &config)?;
+
+                // Create sections from parts
+                let (text, sections) = prompt_utils::build_slash_command_output(pr_prompt_parts);
+
+                Ok(zed::SlashCommandOutput { text, sections })
+            }
+            "pr-current" => {
+                let cwd = worktree
+                    .map(|worktree| worktree.root_path())
+                    .unwrap_or_else(|| "No worktree".to_string());
+
+                // Extract owner and repo from git remote URL
+                let (owner, repo) = match crate::git::get_repo(&cwd) {
+                    Ok(parts) if parts.len() >= 2 => (parts[0].clone(), parts[1].clone()),
+                    Ok(_) => {
+                        return Err(
+                            "Could not extract owner and repo from git remote URL".to_string()
+                        )
+                    }
+                    Err(e) => return Err(format!("Failed to get repository info: {}", e)),
+                };
+                // Get the current branch name
+                let branch = match git::get_current_branch(&cwd) {
+                    Ok(branch) => Some(branch),
+                    Err(_) => None,
+                };
+
+                // Get open PRs for this repo and branch
+                let prs = github_api::get_github_open_pull_requests(
+                    &owner,
+                    &repo,
+                    &config,
+                    branch.as_deref(),
+                )
+                .map_err(|e| format!("Failed to get pull requests: {}", e))?;
+
+                // Check if there are any PRs
+                if prs.is_empty() {
+                    return Err(format!(
+                        "No open pull requests found for branch: {:?}",
+                        branch
+                    ));
+                }
+
+                // Use the first PR (most recent)
+                let pr_number = prs[0].number;
+
+                let pr_prompt_parts = commands::pr_data(&owner, &repo, pr_number, &config)?;
 
                 // Create sections from parts
                 let (text, sections) = prompt_utils::build_slash_command_output(pr_prompt_parts);
